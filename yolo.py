@@ -1,81 +1,42 @@
 import cv2
-import numpy as np
+from tracker import *
 
-def main():
-    source_type = input("Enter 'camera' for camera detection or 'video' for video upload: ")
+cap = cv2.VideoCapture('task1/test2.mp4')
 
-    if source_type.lower() == 'camera':
-        cap = cv2.VideoCapture(0)  # Use default camera (index 0)
-    elif source_type.lower() == 'video':
-        cap = cv2.VideoCapture("/home/tnqn/Documents/personal/detecting_cars/task1/cars.mp4")
-    else:
-        print("Invalid input. Exiting...")
-        return
+car_tracker_ob = EuclideanDistTracker()
 
-    if not cap.isOpened():
-        print("Failed to open the video source. Exiting...")
-        return
+object_detector = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=100)
+while True:
+    ret, frame = cap.read()
+    roi = frame[200:-100, 300:-690]
+   
+    mask = object_detector.apply(roi)
+    _, mask = cv2.threshold(mask, 254, 255, cv2.THRESH_BINARY)
+    contours,_ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    detected_cars = []
+    for cnt in contours:
+        # cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
+        if cv2.contourArea(cnt) > 5000:
+            x, y, w, h = cv2.boundingRect(cnt)
+            detected_object = [x, y, w, h]
+            if detected_object not in detected_cars:
+                detected_cars.append([x, y, w, h])
+    cars_tracked = car_tracker_ob.update(detected_cars)
 
-    # Load pre-trained YOLOv3 model
-    net = cv2.dnn.readNetFromDarknet("darknet/cfg/yolov3.cfg", "darknet/yolov3.weights")
+    for car in cars_tracked:
+        x, y, w, h, id = car
+        cv2.putText(frame,str(id), (x, y-15), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.rectangle(roi, (x, y), (x+w, y+h), (0, 255, 0), 3)
 
-    # Define the output layer names
-    layer_names = net.getLayerNames()
-    output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Failed to receive a frame. Exiting...")
-            break
+    cv2.imshow('Frame', roi)
+    # cv2.imshow('Frame', frame)
+    # cv2.imshow('Mask', mask)
 
-        # Perform object detection
-        blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
-        net.setInput(blob)
-        outs = net.forward(output_layers)
+    key = cv2.waitKey(30)
+    if key == 27:
+        break
+cap.release()
+cv2.destroyAllWindows()
 
-        # Process the detected objects
-        class_ids = []
-        confidences = []
-        boxes = []
-        for out in outs:
-            for detection in out:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
-                if confidence > 0.5 and class_id == 2:  # Class ID for cars is 2
-                    # Scale the bounding box coordinates
-                    width = frame.shape[1]
-                    height = frame.shape[0]
-                    center_x = int(detection[0] * width)
-                    center_y = int(detection[1] * height)
-                    w = int(detection[2] * width)
-                    h = int(detection[3] * height)
-                    x = int(center_x - w / 2)
-                    y = int(center_y - h / 2)
-
-                    # Store the detected car information
-                    class_ids.append(class_id)
-                    confidences.append(float(confidence))
-                    boxes.append([x, y, w, h])
-
-        # Apply non-maximum suppression to eliminate redundant overlapping boxes
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
-
-        # Draw the bounding boxes on the frame
-        for i in indices:
-            i = i[0]
-            x, y, w, h = boxes[i]
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-        # Display the frame
-        cv2.imshow('Frame', frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    main()
+    
