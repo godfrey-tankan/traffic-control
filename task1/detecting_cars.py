@@ -60,9 +60,12 @@ def main():
             if cv2.contourArea(contour) > 1000:
                 # Get bounding box coordinates
                 x, y, w, h = cv2.boundingRect(contour)
-
+                aspect_ratio = w / float(h)
+                area = cv2.contourArea(contour)
+                if area > 1000 and aspect_ratio > 1 and aspect_ratio < 2.5:
+                    # Draw bounding box on the frame
+                    cv2.rectangle(frame, (x+roi_x, y+roi_y), (x+w+roi_x, y+h+roi_y), (0, 255, 0), 2)
                 # Draw bounding box on the frame
-                cv2.rectangle(frame, (x+roi_x, y+roi_y), (x+w+roi_x, y+h+roi_y), (0, 255, 0), 2)
 
         # Display the frame
         cv2.imshow('Frame', frame)
