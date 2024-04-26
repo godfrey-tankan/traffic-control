@@ -7,7 +7,7 @@ class EuclideanDistTracker:
         self.center_points = {}
         # Keep the count of the IDs
         # each time a new object id detected, the count will increase by one
-        self.id_count = 0
+        self.id_count = 1
 
 
     def update(self, objects_rect):
